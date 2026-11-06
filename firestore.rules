@@ -1,0 +1,77 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function authedEmail() {
+      return request.auth != null && request.auth.token.email != null
+        ? request.auth.token.email.lower()
+        : '';
+    }
+
+    // Teacher private workspace (profile/settings minus Gemini key, classes, students, full assessments with answer keys, sessions, templates, messages, automations)
+    match /teachers/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+      match /{col}/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // Published assessment mirror (questions WITHOUT answers/rubrics + email->studentId roster)
+    match /public/{assessmentId} {
+      allow read: if request.auth != null && (
+        resource == null ||
+        resource.data.teacherUid == request.auth.uid ||
+        authedEmail() in resource.data.roster
+      );
+      allow create: if request.auth != null && request.resource.data.teacherUid == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.teacherUid == request.auth.uid
+        && request.resource.data.teacherUid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.teacherUid == request.auth.uid;
+    }
+
+    // Student submissions: deterministic doc ID = "{assessmentId}__{studentId}"
+    match /submissions/{docId} {
+      allow get: if request.auth != null && (
+        resource == null ||
+        resource.data.teacherUid == request.auth.uid ||
+        (authedEmail() != '' && resource.data.email == authedEmail()) ||
+        (authedEmail() != '' && get(/databases/$(database)/documents/public/$(resource.data.assessmentId)).data.roster[authedEmail()] == resource.data.studentId)
+      );
+      allow list: if request.auth != null && (
+        resource.data.teacherUid == request.auth.uid ||
+        (authedEmail() != '' && resource.data.email == authedEmail())
+      );
+
+      // Teacher full control
+      allow create: if request.auth != null && request.resource.data.teacherUid == request.auth.uid;
+      allow update, delete: if request.auth != null && resource.data.teacherUid == request.auth.uid;
+
+      // Student create (when submission slot was not pre-created)
+      allow create: if request.auth != null
+        && authedEmail() != ''
+        && exists(/databases/$(database)/documents/public/$(request.resource.data.assessmentId))
+        && get(/databases/$(database)/documents/public/$(request.resource.data.assessmentId)).data.roster[authedEmail()] == request.resource.data.studentId
+        && get(/databases/$(database)/documents/public/$(request.resource.data.assessmentId)).data.teacherUid == request.resource.data.teacherUid
+        && docId == request.resource.data.assessmentId + '__' + request.resource.data.studentId
+        && request.resource.data.email == authedEmail()
+        && request.resource.data.status == 'submitted'
+        && request.resource.data.keys().hasOnly([
+          'id', 'assessmentId', 'studentId', 'teacherUid', 'email',
+          'answers', 'submittedAt', 'status', 'late', 'studentName'
+        ]);
+
+      // Student update (when slot is 'missing' or re-submitting while still 'submitted')
+      allow update: if request.auth != null
+        && authedEmail() != ''
+        && (resource.data.status == 'missing' || resource.data.status == 'submitted')
+        && exists(/databases/$(database)/documents/public/$(resource.data.assessmentId))
+        && get(/databases/$(database)/documents/public/$(resource.data.assessmentId)).data.roster[authedEmail()] == resource.data.studentId
+        && docId == resource.data.assessmentId + '__' + resource.data.studentId
+        && request.resource.data.status == 'submitted'
+        && request.resource.data.email == authedEmail()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'answers', 'submittedAt', 'status', 'late', 'email', 'studentName'
+        ]);
+    }
+  }
+}

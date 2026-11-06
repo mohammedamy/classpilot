@@ -1,4 +1,4 @@
-import { DAY, startOfDay, startOfWeek } from './utils.js';
+import { DAY, startOfDay, startOfWeek, subId } from './utils.js';
 
 // Deterministic PRNG so demo data is stable between reloads.
 function rng(seed) {
@@ -114,7 +114,7 @@ function buildSubmissions(assessments, students, now) {
       else if (past) status = roll < 0.12 ? 'missing' : 'submitted';
       else status = roll < (a.id === 'a_forces' ? 0.3 : 0.5) ? 'submitted' : 'missing';
 
-      const sub = { id: `sub_${a.id}_${s.id}`, assessmentId: a.id, studentId: s.id, status, submittedAt: null, answers: {}, scores: {}, total: null, feedback: '', reviewed: false, late: false };
+      const sub = { id: subId(a.id, s.id), assessmentId: a.id, studentId: s.id, status, submittedAt: null, answers: {}, scores: {}, total: null, feedback: '', reviewed: false, late: false };
       if (status === 'submitted') {
         sub.submittedAt = new Date(Math.min(now - 3600000, due - r() * 3 * DAY)).toISOString();
         if (r() < 0.1 && past) { sub.late = true; sub.submittedAt = new Date(due + 5 * 3600000).toISOString(); }

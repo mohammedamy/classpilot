@@ -1,4 +1,7 @@
+import { getLang, t } from '../i18n/index.js';
+
 export const uid = (p = 'id') => `${p}_${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36).slice(-3)}`;
+export const subId = (assessmentId, studentId) => `${assessmentId}__${studentId}`;
 
 export const DAY = 86400000;
 
@@ -13,23 +16,25 @@ export function colorFor(str = '') {
   return AV_COLORS[h % AV_COLORS.length];
 }
 
+const dateLocale = () => (getLang() === 'ar' ? 'ar-u-nu-latn' : 'en-US');
+
 export function fmtDate(d, opts = { month: 'short', day: 'numeric' }) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString(undefined, opts);
+  return new Date(d).toLocaleDateString(dateLocale(), opts);
 }
 export function fmtTime(d) {
-  return new Date(d).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  return new Date(d).toLocaleTimeString(dateLocale(), { hour: 'numeric', minute: '2-digit' });
 }
 export function fmtDateTime(d) {
   return `${fmtDate(d, { weekday: 'short', month: 'short', day: 'numeric' })} · ${fmtTime(d)}`;
 }
 export function relDays(d) {
   const diff = Math.round((startOfDay(d) - startOfDay(Date.now())) / DAY);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Tomorrow';
-  if (diff === -1) return 'Yesterday';
-  if (diff > 1 && diff < 7) return `In ${diff} days`;
-  if (diff < -1 && diff > -7) return `${-diff} days ago`;
+  if (diff === 0) return t('Today');
+  if (diff === 1) return t('Tomorrow');
+  if (diff === -1) return t('Yesterday');
+  if (diff > 1 && diff < 7) return t('In {n} days', { n: diff });
+  if (diff < -1 && diff > -7) return t('{n} days ago', { n: -diff });
   return fmtDate(d);
 }
 export function startOfDay(d) {
@@ -62,19 +67,19 @@ export function letter(p) {
 }
 
 export const TYPE_META = {
-  quiz: { label: 'Quiz', badge: 'b-blue' },
-  exam: { label: 'Exam', badge: 'b-dark' },
-  homework: { label: 'Homework', badge: 'b-green' },
-  worksheet: { label: 'Worksheet', badge: 'b-amber' },
-  project: { label: 'Project', badge: 'b-red' },
+  quiz: { get label() { return t('Quiz'); }, badge: 'b-blue' },
+  exam: { get label() { return t('Exam'); }, badge: 'b-dark' },
+  homework: { get label() { return t('Homework'); }, badge: 'b-green' },
+  worksheet: { get label() { return t('Worksheet'); }, badge: 'b-amber' },
+  project: { get label() { return t('Project'); }, badge: 'b-red' },
 };
 
 export const Q_TYPES = {
-  mcq: 'Multiple choice',
-  tf: 'True / False',
-  short: 'Short answer',
-  fill: 'Fill in the blank',
-  essay: 'Essay',
+  get mcq() { return t('Multiple choice'); },
+  get tf() { return t('True / False'); },
+  get short() { return t('Short answer'); },
+  get fill() { return t('Fill in the blank'); },
+  get essay() { return t('Essay'); },
 };
 
 export function totalPoints(questions = []) {

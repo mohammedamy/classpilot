@@ -5,6 +5,7 @@ import { useStore } from '../store/store.jsx';
 import { Modal, Spinner, Field, ClassDot } from '../components/ui.jsx';
 import { DAY, startOfWeek, startOfDay, fmtTime, fmtDate, toLocalInput, uid } from '../lib/utils.js';
 import { createMeetEvent, calendarTemplateUrl, demoMeetLink, deleteCalendarEvent } from '../lib/google.js';
+import { t, useLang } from '../i18n/index.js';
 
 const START_H = 7, END_H = 19, SLOT = 52;
 
@@ -32,6 +33,7 @@ export function occurrencesInRange(sessions, from, to) {
 }
 
 export default function Schedule() {
+  const lang = useLang();
   const { db, classMap } = useStore();
   const [week, setWeek] = useState(startOfWeek(Date.now()));
   const [create, setCreate] = useState(null);
@@ -39,37 +41,38 @@ export default function Schedule() {
   const [now, setNow] = useState(Date.now());
   const scroller = useRef();
 
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(t); }, []);
+  useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(timer); }, []);
   useEffect(() => { if (scroller.current) scroller.current.scrollTop = SLOT * 1.5; }, []);
 
   const days = Array.from({ length: 7 }, (_, i) => week + i * DAY);
   const occ = useMemo(() => occurrencesInRange(db.sessions, week, week + 7 * DAY), [db.sessions, week]);
   const hours = Array.from({ length: END_H - START_H }, (_, i) => START_H + i);
-  const minutesFromStart = (t) => { const d = new Date(t); return (d.getHours() - START_H) * 60 + d.getMinutes(); };
-  const totalThisWeek = occ.reduce((t, o) => t + o.session.durationMin, 0);
+  const minutesFromStart = (ts) => { const d = new Date(ts); return (d.getHours() - START_H) * 60 + d.getMinutes(); };
+  const totalThisWeek = occ.reduce((sum, o) => sum + o.session.durationMin, 0);
+  const hoursThisWeek = Math.round(totalThisWeek / 60 * 10) / 10;
 
   return (
     <>
       <div className="page-head">
         <div>
-          <h1>Schedule</h1>
-          <p className="sub">Create online classes with Google Meet or Zoom links, set them to repeat weekly, and invite your students.</p>
+          <h1>{t('Schedule')}</h1>
+          <p className="sub">{t('Create online classes with Google Meet or Zoom links, set them to repeat weekly, and invite your students.')}</p>
         </div>
         <div className="page-actions">
-          <button className="btn btn-primary" id="new-class" onClick={() => { const d = new Date(Math.max(now, week)); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); setCreate({ start: d.getTime() }); }}><Plus /> New online class</button>
+          <button className="btn btn-primary" id="new-class" onClick={() => { const d = new Date(Math.max(now, week)); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); setCreate({ start: d.getTime() }); }}><Plus /> {t('New online class')}</button>
         </div>
       </div>
 
       <div className="card">
         <div className="card-head wrap">
           <div className="row">
-            <button className="btn btn-sm btn-icon" onClick={() => setWeek(week - 7 * DAY)} aria-label="Previous week"><ChevronLeft /></button>
-            <button className="btn btn-sm" onClick={() => setWeek(startOfWeek(Date.now()))}>This week</button>
-            <button className="btn btn-sm btn-icon" onClick={() => setWeek(week + 7 * DAY)} aria-label="Next week"><ChevronRight /></button>
-            <h2 style={{ marginLeft: 8 }}>{fmtDate(week, { month: 'long', day: 'numeric' })} – {fmtDate(week + 6 * DAY, { month: 'long', day: 'numeric', year: 'numeric' })}</h2>
+            <button className="btn btn-sm btn-icon" onClick={() => setWeek(week - 7 * DAY)} aria-label={t('Previous week')}><ChevronLeft className="flip-rtl" /></button>
+            <button className="btn btn-sm" onClick={() => setWeek(startOfWeek(Date.now()))}>{t('This week')}</button>
+            <button className="btn btn-sm btn-icon" onClick={() => setWeek(week + 7 * DAY)} aria-label={t('Next week')}><ChevronRight className="flip-rtl" /></button>
+            <h2 style={{ marginInlineStart: 8 }}>{fmtDate(week, { month: 'long', day: 'numeric' })} – {fmtDate(week + 6 * DAY, { month: 'long', day: 'numeric', year: 'numeric' })}</h2>
           </div>
           <div className="row wrap small muted" style={{ gap: 12 }}>
-            <span>{occ.length} classes · {Math.round(totalThisWeek / 60 * 10) / 10} h</span>
+            <span>{occ.length === 1 ? t('1 class · {hours} h', { hours: hoursThisWeek }) : t('{count} classes · {hours} h', { count: occ.length, hours: hoursThisWeek })}</span>
             {db.classes.map((c) => <span key={c.id} className="row" style={{ gap: 5 }}><ClassDot cls={c} />{c.name}</span>)}
           </div>
         </div>
@@ -89,7 +92,7 @@ export default function Schedule() {
               const dayOcc = occ.filter((o) => startOfDay(o.start) === d);
               return (
                 <div key={d} className="cal-col">
-                  {hours.map((h) => <div key={h} className="cal-slot" onClick={() => setCreate({ start: d + h * 3600000 })} title="Create class here" />)}
+                  {hours.map((h) => <div key={h} className="cal-slot" onClick={() => setCreate({ start: d + h * 3600000 })} title={t('Create class here')} />)}
                   {startOfDay(now) === d && minutesFromStart(now) > 0 && minutesFromStart(now) < (END_H - START_H) * 60 && <div className="cal-now" style={{ top: minutesFromStart(now) / 60 * SLOT }} />}
                   {dayOcc.map((o) => {
                     const cls = classMap[o.session.classId];
@@ -98,9 +101,9 @@ export default function Schedule() {
                     const past = o.end < now;
                     return (
                       <div key={o.key} className="cal-event" onClick={() => setOpen(o)}
-                        style={{ top, height: h, background: `color-mix(in hsl, ${cls?.color || 'gray'} 14%, white)`, color: `color-mix(in hsl, ${cls?.color || 'gray'} 70%, black)`, opacity: past ? 0.6 : 1, boxShadow: `inset 3px 0 0 ${cls?.color}` }}>
+                        style={{ top, height: h, background: `color-mix(in hsl, ${cls?.color || 'gray'} 14%, white)`, color: `color-mix(in hsl, ${cls?.color || 'gray'} 70%, black)`, opacity: past ? 0.6 : 1, boxShadow: `inset ${lang === 'ar' ? -3 : 3}px 0 0 ${cls?.color}` }}>
                         <div className="t truncate">{o.session.title}</div>
-                        {h > 34 && <div className="s">{fmtTime(o.start)} · {o.session.platform === 'zoom' ? 'Zoom' : 'Meet'}{o.session.recurring === 'weekly' ? ' · ↻' : ''}</div>}
+                        {h > 34 && <div className="s">{fmtTime(o.start)} · {o.session.platform === 'zoom' ? t('Zoom') : t('Meet')}{o.session.recurring === 'weekly' ? ' · ↻' : ''}</div>}
                       </div>
                     );
                   })}
@@ -118,11 +121,12 @@ export default function Schedule() {
 }
 
 function CreateModal({ initial, onClose }) {
+  useLang();
   const { db, update, toast, classMap } = useStore();
   const [f, setF] = useState({ classId: db.classes[0].id, title: '', start: toLocalInput(initial.start), durationMin: 45, platform: db.settings.defaultPlatform || 'meet', recurring: 'weekly', invite: true, customLink: '' });
   const [busy, setBusy] = useState(false);
   const cls = classMap[f.classId];
-  const title = f.title || `${cls?.name} — Online class`;
+  const title = f.title || t('{className} — Online class', { className: cls?.name });
 
   async function save() {
     setBusy(true);
@@ -132,17 +136,17 @@ function CreateModal({ initial, onClose }) {
       if (!link && f.platform === 'meet') {
         if (db.settings.googleClientId) {
           const attendees = f.invite ? db.students.filter((s) => s.classId === f.classId).map((s) => s.email) : [];
-          const ev = await createMeetEvent(db.settings.googleClientId, { title, description: `Online class for ${cls?.name}. Created with ClassPilot.`, start, durationMin: Number(f.durationMin), attendees, weekly: f.recurring === 'weekly' });
+          const ev = await createMeetEvent(db.settings.googleClientId, { title, description: t('Online class for {className}. Created with ClassPilot.', { className: cls?.name }), start, durationMin: Number(f.durationMin), attendees, weekly: f.recurring === 'weekly' });
           link = ev.link; eventId = ev.eventId;
-          note = f.invite ? ' · invites sent from Google Calendar' : '';
+          note = f.invite ? t(' · invites sent from Google Calendar') : '';
         } else {
           link = demoMeetLink();
-          note = ' (demo link: connect Google in Settings for real Meet links)';
+          note = t(' (demo link: connect Google in Settings for real Meet links)');
         }
       }
       if (!link && f.platform === 'zoom') link = db.settings.zoomLink || 'https://zoom.us/';
       update((db) => { db.sessions.push({ id: uid('ses'), classId: f.classId, title, start, durationMin: Number(f.durationMin), platform: f.platform, link, recurring: f.recurring, calendarEventId: eventId }); });
-      toast(`Class scheduled${note}`);
+      toast(t('Class scheduled{note}', { note }));
       onClose();
     } catch (e) {
       toast(e.message, 'error');
@@ -150,35 +154,36 @@ function CreateModal({ initial, onClose }) {
   }
 
   return (
-    <Modal title="New online class" onClose={onClose} footer={<>
-      <a className="btn" href={calendarTemplateUrl({ title, description: `Online class for ${cls?.name}`, start: new Date(f.start), durationMin: Number(f.durationMin), weekly: f.recurring === 'weekly' })} target="_blank" rel="noreferrer"><CalendarDays /> Open in Google Calendar</a>
-      <button className="btn btn-primary" id="create-class" onClick={save} disabled={busy}>{busy ? <Spinner /> : <Video />} Create class</button>
+    <Modal title={t('New online class')} onClose={onClose} footer={<>
+      <a className="btn" href={calendarTemplateUrl({ title, description: t('Online class for {className}', { className: cls?.name }), start: new Date(f.start), durationMin: Number(f.durationMin), weekly: f.recurring === 'weekly' })} target="_blank" rel="noreferrer"><CalendarDays /> {t('Open in Google Calendar')}</a>
+      <button className="btn btn-primary" id="create-class" onClick={save} disabled={busy}>{busy ? <Spinner /> : <Video />} {t('Create class')}</button>
     </>}>
       <div className="grid cols-2" style={{ gap: 12 }}>
-        <Field label="Class"><select className="select" value={f.classId} onChange={(e) => setF({ ...f, classId: e.target.value })}>{db.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
-        <Field label="Title"><input className="input" value={f.title} placeholder={`${cls?.name} — Online class`} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
-        <Field label="Starts"><input type="datetime-local" className="input" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value })} /></Field>
-        <Field label="Duration"><select className="select" value={f.durationMin} onChange={(e) => setF({ ...f, durationMin: e.target.value })}>{[30, 40, 45, 50, 60, 90].map((m) => <option key={m} value={m}>{m} minutes</option>)}</select></Field>
+        <Field label={t('Class')}><select className="select" value={f.classId} onChange={(e) => setF({ ...f, classId: e.target.value })}>{db.classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+        <Field label={t('Title')}><input className="input" value={f.title} placeholder={t('{className} — Online class', { className: cls?.name })} onChange={(e) => setF({ ...f, title: e.target.value })} /></Field>
+        <Field label={t('Starts')}><input type="datetime-local" className="input" value={f.start} onChange={(e) => setF({ ...f, start: e.target.value })} /></Field>
+        <Field label={t('Duration')}><select className="select" value={f.durationMin} onChange={(e) => setF({ ...f, durationMin: e.target.value })}>{[30, 40, 45, 50, 60, 90].map((m) => <option key={m} value={m}>{t('{m} minutes', { m })}</option>)}</select></Field>
       </div>
-      <Field label="Platform">
+      <Field label={t('Platform')}>
         <div className="seg">
-          <button className={f.platform === 'meet' ? 'on' : ''} onClick={() => setF({ ...f, platform: 'meet' })}><Video /> Google Meet</button>
-          <button className={f.platform === 'zoom' ? 'on' : ''} onClick={() => setF({ ...f, platform: 'zoom' })}><Video /> Zoom</button>
+          <button className={f.platform === 'meet' ? 'on' : ''} onClick={() => setF({ ...f, platform: 'meet' })}><Video /> {t('Google Meet')}</button>
+          <button className={f.platform === 'zoom' ? 'on' : ''} onClick={() => setF({ ...f, platform: 'zoom' })}><Video /> {t('Zoom')}</button>
         </div>
       </Field>
-      <Field label="Meeting link (optional)" help={f.platform === 'meet' ? 'Leave empty to auto-create a Google Meet link through Google Calendar.' : `Leave empty to use your Zoom room from Settings (${db.settings.zoomLink || 'not set'}).`}>
+      <Field label={t('Meeting link (optional)')} help={f.platform === 'meet' ? t('Leave empty to auto-create a Google Meet link through Google Calendar.') : t('Leave empty to use your Zoom room from Settings ({zoom}).', { zoom: db.settings.zoomLink || t('not set') })}>
         <input className="input" value={f.customLink} onChange={(e) => setF({ ...f, customLink: e.target.value })} placeholder={f.platform === 'meet' ? 'https://meet.google.com/…' : 'https://zoom.us/j/…'} />
       </Field>
       <div className="row wrap" style={{ gap: 18 }}>
-        <label className="checkbox small"><input type="checkbox" checked={f.recurring === 'weekly'} onChange={(e) => setF({ ...f, recurring: e.target.checked ? 'weekly' : 'none' })} /> <Repeat size={14} /> Repeat weekly</label>
-        {f.platform === 'meet' && <label className="checkbox small"><input type="checkbox" checked={f.invite} onChange={(e) => setF({ ...f, invite: e.target.checked })} /> Send calendar invites to students</label>}
+        <label className="checkbox small"><input type="checkbox" checked={f.recurring === 'weekly'} onChange={(e) => setF({ ...f, recurring: e.target.checked ? 'weekly' : 'none' })} /> <Repeat size={14} /> {t('Repeat weekly')}</label>
+        {f.platform === 'meet' && <label className="checkbox small"><input type="checkbox" checked={f.invite} onChange={(e) => setF({ ...f, invite: e.target.checked })} /> {t('Send calendar invites to students')}</label>}
       </div>
-      {!db.settings.googleClientId && f.platform === 'meet' && <div className="banner info small"><Info /> Demo mode: a sample Meet link will be created. Add your Google Client ID in Settings to generate real Meet links and calendar invites.</div>}
+      {!db.settings.googleClientId && f.platform === 'meet' && <div className="banner info small"><Info /> {t('Demo mode: a sample Meet link will be created. Add your Google Client ID in Settings to generate real Meet links and calendar invites.')}</div>}
     </Modal>
   );
 }
 
 function EventModal({ occ, onClose }) {
+  useLang();
   const { db, update, toast, classMap } = useStore();
   const nav = useNavigate();
   const s = occ.session;
@@ -186,26 +191,37 @@ function EventModal({ occ, onClose }) {
 
   function removeOne() {
     update((db) => { const x = db.sessions.find((y) => y.id === s.id); x.exceptions = [...(x.exceptions || []), startOfDay(occ.start)]; });
-    toast('This occurrence was cancelled'); onClose();
+    toast(t('This occurrence was cancelled')); onClose();
   }
   async function removeAll() {
     if (s.calendarEventId && db.settings.googleClientId) { try { await deleteCalendarEvent(db.settings.googleClientId, s.calendarEventId); } catch { /* ignore */ } }
     update((db) => { db.sessions = db.sessions.filter((y) => y.id !== s.id); });
-    toast('Class removed'); onClose();
+    toast(t('Class removed')); onClose();
   }
   return (
     <Modal title={s.title} onClose={onClose} footer={<>
-      {s.recurring === 'weekly' && <button className="btn btn-danger" onClick={removeOne}>Cancel this one</button>}
-      <button className="btn btn-danger" onClick={removeAll}><Trash2 /> Delete{s.recurring === 'weekly' ? ' series' : ''}</button>
-      <a className="btn btn-primary" href={s.link} target="_blank" rel="noreferrer"><ExternalLink /> Join</a>
+      {s.recurring === 'weekly' && <button className="btn btn-danger" onClick={removeOne}>{t('Cancel this one')}</button>}
+      <button className="btn btn-danger" onClick={removeAll}><Trash2 /> {s.recurring === 'weekly' ? t('Delete series') : t('Delete')}</button>
+      <a className="btn btn-primary" href={s.link} target="_blank" rel="noreferrer"><ExternalLink /> {t('Join')}</a>
     </>}>
-      <div className="row" style={{ gap: 8 }}><ClassDot cls={cls} /><span className="strong">{cls?.name}</span>{s.recurring === 'weekly' && <span className="badge"><Repeat /> Weekly</span>}<span className={`badge ${s.platform === 'zoom' ? 'b-blue' : 'b-green'}`}>{s.platform === 'zoom' ? 'Zoom' : 'Google Meet'}</span></div>
+      <div className="row" style={{ gap: 8 }}><ClassDot cls={cls} /><span className="strong">{cls?.name}</span>{s.recurring === 'weekly' && <span className="badge"><Repeat /> {t('Weekly')}</span>}<span className={`badge ${s.platform === 'zoom' ? 'b-blue' : 'b-green'}`}>{s.platform === 'zoom' ? t('Zoom') : t('Google Meet')}</span></div>
       <div className="small muted">{fmtDate(occ.start, { weekday: 'long', month: 'long', day: 'numeric' })} · {fmtTime(occ.start)} – {fmtTime(occ.end)}</div>
-      <div className="row"><input className="input mono small" readOnly value={s.link} onFocus={(e) => e.target.select()} /><button className="btn" onClick={() => { navigator.clipboard.writeText(s.link); toast('Link copied'); }}><Copy /> Copy</button></div>
+      <div className="row"><input className="input mono small" readOnly value={s.link} onFocus={(e) => e.target.select()} /><button className="btn" onClick={() => { navigator.clipboard.writeText(s.link); toast(t('Link copied')); }}><Copy /> {t('Copy')}</button></div>
       <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => {
-        sessionStorage.setItem('cp:prefill', JSON.stringify({ subject: `Online class: ${s.title}`, body: `Hi {{studentName}},\n\nOur next online class is on ${fmtDate(occ.start, { weekday: 'long', month: 'long', day: 'numeric' })} at ${fmtTime(occ.start)}.\nJoin here: ${s.link}\n\nSee you there,\n{{teacherName}}`, classIds: [s.classId], audience: 'students' }));
+        sessionStorage.setItem('cp:prefill', JSON.stringify({
+          subject: t('Online class: {title}', { title: s.title }),
+          body: t('Hi {student},\n\nOur next online class is on {date} at {time}.\nJoin here: {link}\n\nSee you there,\n{teacher}', {
+            student: '{{studentName}}',
+            date: fmtDate(occ.start, { weekday: 'long', month: 'long', day: 'numeric' }),
+            time: fmtTime(occ.start),
+            link: s.link,
+            teacher: '{{teacherName}}',
+          }),
+          classIds: [s.classId],
+          audience: 'students',
+        }));
         nav('/messages?prefill=1');
-      }}><Mail /> Email link to {cls?.name}</button>
+      }}><Mail /> {t('Email link to {className}', { className: cls?.name })}</button>
     </Modal>
   );
 }

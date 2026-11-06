@@ -1,13 +1,14 @@
 // Gemini client (browser → Gemini API directly with the teacher's own key).
 // Falls back to a local "demo mode" generator when no key is configured.
 import { fileToBase64, fileToText, uid } from './utils.js';
+import { t } from '../i18n/index.js';
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 export const GEMINI_MODELS = [
-  { id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash — best balance (recommended)' },
-  { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite — fastest, lowest cost' },
-  { id: 'gemini-4-argon', label: 'Gemini 4 Argon — deepest reasoning' },
+  { id: 'gemini-3.8-flash', get label() { return t('Gemini 3.8 Flash — best balance (recommended)'); } },
+  { id: 'gemini-3.5-flash-lite', get label() { return t('Gemini 3.5 Flash-Lite — fastest, lowest cost'); } },
+  { id: 'gemini-4-argon', get label() { return t('Gemini 4 Argon — deepest reasoning'); } },
 ];
 
 const INLINE_TYPES = ['application/pdf', 'image/png', 'image/jpeg', 'image/webp', 'image/heic', 'text/plain', 'text/markdown', 'text/csv', 'text/html'];
@@ -22,7 +23,7 @@ export async function filesToParts(files = []) {
     } else if (INLINE_TYPES.includes(type)) {
       parts.push({ inline_data: { mime_type: type, data: await fileToBase64(f) } });
     } else {
-      throw new Error(`"${f.name}" isn't supported. Upload PDF, image, or text files (for Word/PowerPoint, export to PDF first).`);
+      throw new Error(t('"{name}" isn’t supported. Upload PDF, image, or text files (for Word/PowerPoint, export to PDF first).', { name: f.name }));
     }
   }
   return parts;
@@ -40,13 +41,13 @@ async function callGemini({ key, model, system, parts, json = true, thinking }) 
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error?.message || `Gemini request failed (${res.status})`);
+  if (!res.ok) throw new Error(data?.error?.message || t('Gemini request failed ({status})', { status: res.status }));
   const text = (data.candidates?.[0]?.content?.parts || []).filter((p) => !p.thought).map((p) => p.text || '').join('');
   if (!json) return text;
   try {
     return JSON.parse(text.replace(/^```json\s*|```$/g, ''));
   } catch {
-    throw new Error('Gemini returned an unexpected format. Please try again.');
+    throw new Error(t('Gemini returned an unexpected format. Please try again.'));
   }
 }
 

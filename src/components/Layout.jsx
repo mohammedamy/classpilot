@@ -1,32 +1,35 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ClipboardList, Sparkles, CheckCheck, Table, Mail, CalendarDays, Settings, Menu, Bot } from 'lucide-react';
+import { LayoutDashboard, Users, ClipboardList, Sparkles, CheckCheck, Table, Mail, CalendarDays, Settings, Menu, Bot, Globe, Cloud, CloudOff, LogOut } from 'lucide-react';
 import { useStore } from '../store/store.jsx';
 import { Avatar, Toasts } from './ui.jsx';
 import { hasKey } from '../lib/gemini.js';
+import { isFirebaseEnabled, signOutUser } from '../lib/firebase.js';
+import { t, toggleLang, useLang } from '../i18n/index.js';
 
 export default function Layout() {
-  const { db } = useStore();
+  const { db, user, syncState } = useStore();
+  const lang = useLang();
   const [open, setOpen] = useState(false);
   const loc = useLocation();
   const toGrade = db.submissions.filter((s) => s.status === 'submitted').length;
   const unsynced = Object.keys(db.unsynced || {}).length;
 
   const nav = [
-    { label: 'Overview', items: [{ to: '/', icon: LayoutDashboard, text: 'Today', end: true }] },
+    { label: t('Overview'), items: [{ to: '/', icon: LayoutDashboard, text: t('Today'), end: true }] },
     {
-      label: 'Teach', items: [
-        { to: '/studio', icon: Sparkles, text: 'AI Studio' },
-        { to: '/assignments', icon: ClipboardList, text: 'Assignments' },
-        { to: '/grading', icon: CheckCheck, text: 'Auto-correct', count: toGrade },
-        { to: '/gradebook', icon: Table, text: 'Gradebook', count: unsynced },
+      label: t('Teach'), items: [
+        { to: '/studio', icon: Sparkles, text: t('AI Studio') },
+        { to: '/assignments', icon: ClipboardList, text: t('Assignments') },
+        { to: '/grading', icon: CheckCheck, text: t('Auto-correct'), count: toGrade },
+        { to: '/gradebook', icon: Table, text: t('Gradebook'), count: unsynced },
       ],
     },
     {
-      label: 'Connect', items: [
-        { to: '/messages', icon: Mail, text: 'Messages' },
-        { to: '/schedule', icon: CalendarDays, text: 'Schedule' },
-        { to: '/classes', icon: Users, text: 'Classes & students' },
+      label: t('Connect'), items: [
+        { to: '/messages', icon: Mail, text: t('Messages') },
+        { to: '/schedule', icon: CalendarDays, text: t('Schedule') },
+        { to: '/classes', icon: Users, text: t('Classes & students') },
       ],
     },
   ];
@@ -35,10 +38,10 @@ export default function Layout() {
     <div className="app">
       <aside className={`sidebar ${open ? 'open' : ''}`} onClick={() => setOpen(false)}>
         <div className="brand">
-          <img src="/favicon.svg" width="30" height="30" alt="" />
+          <img src={`${import.meta.env.BASE_URL}favicon.svg`} width="30" height="30" alt="" />
           <div>
             <div className="brand-name">ClassPilot</div>
-            <div className="brand-sub">for Classera teachers</div>
+            <div className="brand-sub">{t('for Classera teachers')}</div>
           </div>
         </div>
         {nav.map((g) => (
@@ -54,7 +57,7 @@ export default function Layout() {
           </div>
         ))}
         <NavLink to="/settings" className="nav-link" id="nav-settings" style={{ marginTop: 8 }}>
-          <Settings size={18} /> Settings
+          <Settings size={18} /> {t('Settings')}
         </NavLink>
         <div className="sidebar-foot">
           <Avatar name={db.settings.teacherName} />
@@ -67,11 +70,32 @@ export default function Layout() {
 
       <div className="main">
         <header className="topbar">
-          <button className="btn btn-ghost btn-icon menu-btn" onClick={() => setOpen(true)} aria-label="Open menu"><Menu /></button>
+          <button className="btn btn-ghost btn-icon menu-btn" onClick={() => setOpen(true)} aria-label={t('Open menu')}><Menu /></button>
           <div className="grow" />
-          <NavLink to="/settings" className={`badge ${hasKey(db.settings) ? 'b-green' : 'b-amber'}`} title="AI status">
-            <Bot /> {hasKey(db.settings) ? `Gemini connected` : 'Demo AI — add Gemini key'}
+          <button type="button" className="lang-switch" id="lang-toggle" onClick={toggleLang} title={t('Switch language')}>
+            <Globe /> {lang === 'ar' ? 'English' : 'العربية'}
+          </button>
+          {isFirebaseEnabled && (
+            <NavLink to="/settings" className={`badge ${syncState === 'error' ? 'b-red' : syncState === 'synced' ? 'b-green' : 'b-blue'}`} title={t('Cloud sync')}>
+              {syncState === 'error' ? <CloudOff /> : <Cloud />}
+              {syncState === 'synced' ? t('Cloud synced') : syncState === 'error' ? t('Sync error') : t('Syncing…')}
+            </NavLink>
+          )}
+          <NavLink to="/settings" className={`badge ${hasKey(db.settings) ? 'b-green' : 'b-amber'}`} title={t('AI status')}>
+            <Bot /> {hasKey(db.settings) ? t('Gemini connected') : t('Demo AI — add Gemini key')}
           </NavLink>
+          {isFirebaseEnabled && user && (
+            <div className="row" style={{ gap: 6 }}>
+              {user.photoURL ? (
+                <img src={user.photoURL} width="28" height="28" alt="" style={{ borderRadius: '50%' }} referrerPolicy="no-referrer" />
+              ) : (
+                <Avatar name={user.displayName || user.email || 'T'} size="sm" />
+              )}
+              <button type="button" className="btn btn-ghost btn-sm btn-icon" onClick={signOutUser} title={t('Sign out')} aria-label={t('Sign out')}>
+                <LogOut size={15} />
+              </button>
+            </div>
+          )}
         </header>
         <div className="page" key={loc.pathname.split('/')[1] || 'home'}>
           <Outlet />

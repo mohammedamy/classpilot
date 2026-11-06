@@ -1,6 +1,8 @@
-# ClassPilot: AI teaching assistant for Classera teachers
+# ClassPilot — AI Teaching Assistant for Classera Teachers
 
-ClassPilot helps teachers manage their classes alongside Classera:
+**Live app:** https://mohammedamy.github.io/classpilot/
+
+ClassPilot helps teachers manage their classes alongside Classera — in **English** and **Arabic (العربية — full RTL)**:
 
 | # | Feature | Where |
 |---|---------|-------|
@@ -11,62 +13,85 @@ ClassPilot helps teachers manage their classes alongside Classera:
 | 5 | Personalized emails to students and parents (average, missing work, upcoming), AI drafting, weekly automations | **Messages** |
 | 6 | Online classes with Google Meet (auto-generated through Google Calendar) or Zoom, weekly recurrence, invites | **Schedule** |
 
-## Run it
+---
+
+## Run Locally
 
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm run build      # static site in dist/ (deploy to any static host)
+npm run build      # production bundle in dist/
 ```
 
-The app opens with realistic **demo data** (3 classes, 24 students). Reset it any time in **Settings → Data**.
+The app opens with realistic **demo data** (3 classes, 24 students). Switch between **English** and **العربية (RTL)** anytime from the top bar or **Settings**, or click **Start empty** in **Settings → Data** when you're ready to load your real classes.
 
-## Connect real services (Settings)
+---
+
+## Connect Firebase (Cloud Sync + Student Submissions from Any Device)
+
+Without Firebase, ClassPilot runs in **local browser mode**. Connecting Firebase enables:
+- **Teacher Google sign-in** and real-time Firestore sync across your devices.
+- **Remote student submissions:** students open `#/take/<assessmentId>` on their own phone or laptop, sign in with their school Google account, and submit answers securely (answer keys and rubrics stay private in the teacher workspace).
+
+### 1. Create the Firebase Project
+1. Go to [Firebase Console](https://console.firebase.google.com/) → **Create a project**.
+2. Go to **Build → Authentication → Get started → Sign-in method**, enable **Google**, and under **Settings → Authorized domains** add `mohammedamy.github.io`.
+3. Go to **Build → Firestore Database → Create database** (start in production mode).
+4. Open the **Rules** tab, paste the contents of [`firestore.rules`](./firestore.rules), and click **Publish**.
+5. Go to **Project settings (⚙️) → Your apps → Web (`</>`)**, register an app, and copy the `firebaseConfig` values.
+
+### 2. Add Firebase Config to GitHub Actions (for GitHub Pages)
+In your GitHub repository, open **Settings → Secrets and variables → Actions → Variables** (Repository variables) and add:
+
+| Variable name | Value from `firebaseConfig` |
+|---|---|
+| `VITE_FIREBASE_API_KEY` | `apiKey` |
+| `VITE_FIREBASE_AUTH_DOMAIN` | `authDomain` |
+| `VITE_FIREBASE_PROJECT_ID` | `projectId` |
+| `VITE_FIREBASE_STORAGE_BUCKET` | `storageBucket` |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | `messagingSenderId` |
+| `VITE_FIREBASE_APP_ID` | `appId` |
+
+*(Optional)* To auto-deploy `firestore.rules` on every push, add a repository **Secret** named `FIREBASE_SERVICE_ACCOUNT` containing a Firebase Admin service account JSON.
+
+Then re-run the **Deploy ClassPilot to GitHub Pages** workflow in the **Actions** tab (or copy `.env.example` to `.env` for local development).
+
+> **Important:** Student emails in **Classes & students** must match the Google email each student uses to sign in on `#/take/<id>`.
+
+---
+
+## Connect Google Gemini, Google Workspace, Zoom & Classera
 
 ### Google Gemini (AI generation, grading, email drafts)
-1. Create a key at https://aistudio.google.com/apikey
-2. Paste it in **Settings → Google Gemini**, then click **Test**.
-3. Default model: `gemini-3.8-flash`. You can switch to `gemini-3.5-flash-lite` (cheaper) or `gemini-4-argon` (deepest reasoning).
-
-Without a key, the app runs in **demo mode** (template questions and keyword grading), so you can try every flow.
+1. Create an API key at [Google AI Studio](https://aistudio.google.com/apikey).
+2. Paste it in **Settings → Google Gemini** and click **Test**. *(Your Gemini key is stored only in your local browser and is never uploaded to Firestore.)*
+3. Default model: `gemini-3.8-flash` (switchable to `gemini-3.5-flash-lite` or `gemini-4-argon`). Without a key, ClassPilot runs in **Demo AI** mode.
 
 ### Google Calendar + Meet + Gmail
-1. Open Google Cloud Console and create a project. Enable the **Google Calendar API** and **Gmail API**.
-2. Set up the OAuth consent screen and add the scopes `calendar.events` and `gmail.send`.
-3. Go to **Credentials → Create OAuth client ID → Web application**, and add your site's URL (e.g. `http://localhost:5173`) as an **Authorized JavaScript origin**.
-4. Paste the Client ID in **Settings → Google Workspace**, then click **Connect**.
-
-After that:
-- **Schedule → New online class** creates a real Calendar event with a Meet link and sends invites to students.
-- **Messages → Send via Gmail** sends one personalized email per recipient from your account.
+1. In [Google Cloud Console](https://console.cloud.google.com/) (you can use the same Google Cloud project behind Firebase), enable the **Google Calendar API** and **Gmail API**.
+2. Configure the OAuth consent screen with scopes `calendar.events` and `gmail.send`.
+3. Under **Credentials → Create OAuth client ID → Web application**, add `https://mohammedamy.github.io` (and `http://localhost:5173` for local dev) under **Authorized JavaScript origins**.
+4. Paste the Client ID in **Settings → Google Workspace** and click **Connect Google account**.
 
 ### Zoom
-Set your Personal Meeting Room link in Settings. New Zoom classes use it, or you can paste any link.
-Auto-creating unique Zoom meetings needs a Zoom OAuth app plus a backend (see the roadmap).
+Save your Personal Meeting Room link in **Settings → Online classes** (or paste custom links per session).
 
 ### Classera
-Classera doesn't publish an open API, so ClassPilot works through Classera's CSV/Excel import and export:
-- **Classes → Import Classera CSV** reads columns such as `Student ID, Student Name, Email, Parent Name, Parent Email, Group`. Arabic headers are also supported.
-- **Gradebook → Sync to Classera** downloads the changed marks (or a full gradebook per class) with Classera student IDs, ready for Classera's marks import.
-- **AI Studio → Classera sheet** exports the questions for the Classera question bank.
+Classera doesn't expose a public API, so ClassPilot integrates cleanly via Classera's CSV/Excel import and export:
+- **Classes → Import Classera CSV** accepts English and Arabic headers (`Student ID`, `Student Name`, `Email`, `Parent Name`, `Parent Email`, `Group`).
+- **Gradebook → Sync to Classera** exports changed marks (or full class gradebooks) keyed by Classera Student ID.
+- **AI Studio → Classera sheet** exports generated questions in spreadsheet format.
 
-If your school gets Classera partner API access, put the integration in `src/lib/classera.js`. Sync is already isolated behind the "Sync to Classera" action.
+---
 
-## Architecture
+## Deployment (GitHub Pages)
 
-- React 19 + Vite, plain CSS design system (`src/index.css`), `lucide-react` icons.
-- All data lives in `localStorage` (`src/store/store.jsx`), with cross-tab sync, so a student submitting in another tab appears live in the teacher view.
-- `src/lib/gemini.js`: Gemini REST client (structured JSON output, PDF/image inline input) plus demo fallbacks.
-- `src/lib/google.js`: Google Identity Services token client, Calendar/Meet, Gmail.
-- `src/lib/grading.js`: objective scoring plus batched AI scoring.
-- The student quiz page is `#/take/<assessmentId>`.
+Every push to `main` automatically builds and deploys via [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) to:
+**https://mohammedamy.github.io/classpilot/**
 
-## Roadmap to production
+---
 
-This is a single-teacher prototype. Before real students use it:
-1. **Backend + database** (e.g. Firebase/Supabase or a small Node API): needed so students on their own devices can submit, and to store data centrally.
-2. **Student sign-in** (Google or school SSO) instead of choosing a name from a list.
-3. **Server-side AI calls** so the Gemini key isn't stored in the browser.
-4. **Scheduled jobs** (Cloud Scheduler or cron) so weekly emails go out even when the app is closed.
-5. **Zoom OAuth** for unique meeting links. **Classera API** if available.
-6. Arabic UI / RTL layout.
+## Known Limitations
+- **Classera sync** uses CSV import/export until school-level Classera partner API credentials are available.
+- **Gemini API key** runs directly from the teacher's browser (stored in `localStorage` only).
+- **Weekly email automations** run from the browser when triggered ("Send now"); unattended background scheduling requires Cloud Scheduler / Cloud Functions (Firebase Blaze plan).

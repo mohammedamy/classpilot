@@ -1,6 +1,7 @@
 // Google Workspace integration (Calendar + Meet + Gmail) using Google Identity Services.
 // Requires an OAuth Client ID (Web application) with this app's origin authorised.
 import { fillTemplate } from './utils.js';
+import { t } from '../i18n/index.js';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
@@ -19,7 +20,7 @@ function loadGIS() {
       s.src = 'https://accounts.google.com/gsi/client';
       s.async = true;
       s.onload = res;
-      s.onerror = () => rej(new Error('Could not load Google sign-in.'));
+      s.onerror = () => rej(new Error(t('Could not load Google sign-in.')));
       document.head.appendChild(s);
     });
   }
@@ -29,7 +30,7 @@ function loadGIS() {
 export const isGoogleConnected = () => Boolean(token && Date.now() < tokenExp);
 
 export async function connectGoogle(clientId) {
-  if (!clientId) throw new Error('Add your Google OAuth Client ID in Settings first.');
+  if (!clientId) throw new Error(t('Add your Google OAuth Client ID in Settings first.'));
   await loadGIS();
   return new Promise((resolve, reject) => {
     const client = window.google.accounts.oauth2.initTokenClient({
@@ -41,7 +42,7 @@ export async function connectGoogle(clientId) {
         tokenExp = Date.now() + (Number(resp.expires_in) - 60) * 1000;
         resolve(true);
       },
-      error_callback: (e) => reject(new Error(e?.message || 'Google sign-in was cancelled.')),
+      error_callback: (e) => reject(new Error(e?.message || t('Google sign-in was cancelled.'))),
     });
     client.requestAccessToken({ prompt: token ? '' : 'consent' });
   });
@@ -53,10 +54,10 @@ async function ensureToken(clientId) {
 }
 
 async function gfetch(clientId, url, init = {}) {
-  const t = await ensureToken(clientId);
-  const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json', ...(init.headers || {}) } });
+  const tk = await ensureToken(clientId);
+  const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${tk}`, 'Content-Type': 'application/json', ...(init.headers || {}) } });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error?.message || `Google API error (${res.status})`);
+  if (!res.ok) throw new Error(data?.error?.message || t('Google API error ({status})', { status: res.status }));
   return data;
 }
 
