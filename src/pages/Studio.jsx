@@ -6,6 +6,7 @@ import { Modal, Spinner, Field } from '../components/ui.jsx';
 import { generateAssessment, hasKey } from '../lib/gemini.js';
 import { Q_TYPES, TYPE_META, totalPoints, uid, subId, toLocalInput, DAY } from '../lib/utils.js';
 import { toCSV, download } from '../lib/csv.js';
+import { encodeShareFirebaseParam } from '../lib/firebase.js';
 import { t, getLang, useLang } from '../i18n/index.js';
 
 const EXAMPLES = [
@@ -16,7 +17,7 @@ const EXAMPLES = [
 ];
 
 export function shareLink(id) {
-  return `${window.location.origin}${window.location.pathname}#/take/${id}`;
+  return `${window.location.origin}${window.location.pathname}#/take/${id}${encodeShareFirebaseParam()}`;
 }
 
 export function publishAssessment(db, a) {

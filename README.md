@@ -37,10 +37,17 @@ Without Firebase, ClassPilot runs in **local browser mode**. Connecting Firebase
 1. Go to [Firebase Console](https://console.firebase.google.com/) → **Create a project**.
 2. Go to **Build → Authentication → Get started → Sign-in method**, enable **Google**, and under **Settings → Authorized domains** add `mohammedamy.github.io`.
 3. Go to **Build → Firestore Database → Create database** (start in production mode).
-4. Open the **Rules** tab, paste the contents of [`firestore.rules`](./firestore.rules), and click **Publish**.
-5. Go to **Project settings (⚙️) → Your apps → Web (`</>`)**, register an app, and copy the `firebaseConfig` values.
+4. In ClassPilot (**Settings → Firebase cloud & student devices**), click **Copy Firestore rules** (or copy [`firestore.rules`](./firestore.rules)), paste into the Firebase Console **Firestore → Rules** tab, and click **Publish**.
+5. Go to **Project settings (⚙️) → Your apps → Web (`</>`)**, register an app, and copy the `firebaseConfig` snippet.
 
-### 2. Add Firebase Config to GitHub Actions (for GitHub Pages)
+### 2. Connect ClassPilot to Firebase (Pick Option A or B)
+
+#### Option A — Instant Setup Inside the App (No Rebuild Needed)
+1. Open **https://mohammedamy.github.io/classpilot/#/settings**.
+2. Under **Firebase cloud & student devices**, paste your `firebaseConfig` snippet (either the raw `const firebaseConfig = { ... };` block from Firebase Console or JSON) and click **Connect Firebase**.
+3. Shared student links (`#/take/<id>?fb=...`) automatically carry the public Firebase project identifiers so students opening a quiz link on any phone or laptop connect to your Firebase project right away.
+
+#### Option B — Bake Into Every Build via GitHub Actions Variables
 In your GitHub repository, open **Settings → Secrets and variables → Actions → Variables** (Repository variables) and add:
 
 | Variable name | Value from `firebaseConfig` |

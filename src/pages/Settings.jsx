@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { KeyRound, Bot, CalendarDays, Video, School, Database, Check, ExternalLink, Download, Upload, RefreshCw, PlugZap, Cloud, Globe, Trash2, LogOut } from 'lucide-react';
+import { KeyRound, Bot, CalendarDays, Video, School, Database, Check, ExternalLink, Download, Upload, RefreshCw, PlugZap, Cloud, Globe, Trash2, LogOut, Copy } from 'lucide-react';
 import { useStore } from '../store/store.jsx';
 import { Field, Spinner } from '../components/ui.jsx';
 import { GEMINI_MODELS, testKey } from '../lib/gemini.js';
 import { connectGoogle, isGoogleConnected } from '../lib/google.js';
-import { isFirebaseEnabled, firebaseConfig, signOutUser } from '../lib/firebase.js';
+import {
+  isFirebaseEnabled,
+  isBuildFirebase,
+  firebaseConfig,
+  signOutUser,
+  saveRuntimeFirebaseConfig,
+  clearRuntimeFirebaseConfig,
+} from '../lib/firebase.js';
+import firestoreRulesText from '../../firestore.rules?raw';
 import { download } from '../lib/csv.js';
 import { buildSeed } from '../lib/seed.js';
 import { t, setLang, useLang } from '../i18n/index.js';
@@ -29,6 +37,7 @@ export default function Settings() {
   const [s, setS] = useState(db.settings);
   const [testing, setTesting] = useState(false);
   const [gConn, setGConn] = useState(isGoogleConnected());
+  const [fbSnippet, setFbSnippet] = useState('');
   const fileRef = useRef();
 
   useEffect(() => {
@@ -65,6 +74,17 @@ export default function Settings() {
     } catch (e) {
       toast(e.message, 'error');
     }
+  }
+
+  function connectFb() {
+    if (!saveRuntimeFirebaseConfig(fbSnippet)) {
+      toast(t('Could not find apiKey, projectId, and appId in that snippet.'), 'error');
+    }
+  }
+
+  async function copyRules() {
+    await navigator.clipboard.writeText(firestoreRulesText);
+    toast(t('Firestore security rules copied'));
   }
 
   return (
@@ -117,6 +137,10 @@ export default function Settings() {
                 <div className="row wrap" style={{ gap: 8 }}>
                   <span className={`badge ${syncState === 'error' ? 'b-red' : 'b-green'}`}><Check /> {syncState === 'error' ? t('Sync error') : t('Firebase connected')}</span>
                   <span className="badge mono">{firebaseConfig.projectId}</span>
+                  <button type="button" className="btn btn-sm" onClick={copyRules}><Copy /> {t('Copy Firestore rules')}</button>
+                  {!isBuildFirebase && (
+                    <button type="button" className="btn btn-sm btn-danger" onClick={clearRuntimeFirebaseConfig}>{t('Disconnect')}</button>
+                  )}
                 </div>
                 {user && (
                   <div className="row-between inset small" style={{ marginTop: 6 }}>
@@ -129,8 +153,31 @@ export default function Settings() {
                 )}
               </div>
             ) : (
-              <div className="inset small muted">
-                {t('Running in local browser mode. Add VITE_FIREBASE_* variables in GitHub Actions (or .env) to enable Google sign-in, cloud sync, and remote student submissions.')}
+              <div className="stack">
+                <Field
+                  label={t('Firebase Web App config')}
+                  help={t('In Firebase Console → Build → Authentication (enable Google) & Firestore Database (paste rules below), then copy your Web App firebaseConfig snippet here.')}
+                >
+                  <textarea
+                    className="textarea mono small"
+                    rows={4}
+                    dir="ltr"
+                    placeholder={'const firebaseConfig = {\n  apiKey: "AIza...",\n  projectId: "your-project",\n  appId: "1:..."\n};'}
+                    value={fbSnippet}
+                    onChange={(e) => setFbSnippet(e.target.value)}
+                  />
+                </Field>
+                <div className="row wrap">
+                  <button type="button" className="btn btn-primary btn-sm" disabled={!fbSnippet.trim()} onClick={connectFb}>
+                    <PlugZap /> {t('Connect Firebase')}
+                  </button>
+                  <button type="button" className="btn btn-sm" onClick={copyRules}>
+                    <Copy /> {t('Copy Firestore rules')}
+                  </button>
+                  <a className="btn btn-sm" href="https://console.firebase.google.com/" target="_blank" rel="noreferrer">
+                    Firebase Console <ExternalLink size={12} />
+                  </a>
+                </div>
               </div>
             )}
           </Section>
